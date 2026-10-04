@@ -1,0 +1,11 @@
+# Autodiscovery Id
+api:
+  id: "20916410"
+  
+#Salesforce Credentails
+salesforce:
+  tokenUrl: "https://cumminsdbuindia--partialfsl.sandbox.my.salesforce.com/services/oauth2/token"
+  
+# Task
+task:
+    recordTypeId: "012e1000000DiPpAAK"

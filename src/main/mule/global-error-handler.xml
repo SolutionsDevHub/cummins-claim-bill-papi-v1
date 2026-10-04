@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<error-handler name="global-error-handler" doc:id="224b8a04-ecd9-4d15-b5ac-3ae9b34a49b8" >
+		<on-error-continue enableNotifications="false" logException="false" doc:name="On Error Continue" doc:id="8f486602-63a2-4b2d-842e-5b06d37adca2" type="SALESFORCE:COMMUNICATION, SALESFORCE:CONNECTIVITY, SALESFORCE:INSUFFICIENT_PERMISSIONS, SALESFORCE:INVALID_INPUT, SALESFORCE:INVALID_RESPONSE, SALESFORCE:LIMIT_EXCEEDED, SALESFORCE:MUTUAL_AUTHENTICATION_FAILED, SALESFORCE:NOT_FOUND, SALESFORCE:OPERATION_NOT_SUPPORTED, SALESFORCE:RETRY_EXHAUSTED, SALESFORCE:TIMEOUT, SALESFORCE:UNAVAILABLE">
+			<ee:transform doc:name="Content Version Status" doc:id="8d79eea2-4cb3-4a7a-a54e-9f891aa8b978">
+				<ee:message />
+				<ee:variables>
+					<ee:set-variable variableName="contentVersionStatus"><![CDATA[%dw 2.0
+output application/json
+---
+null]]></ee:set-variable>
+					<ee:set-variable variableName="checkListLineStatus"><![CDATA[%dw 2.0
+output application/json
+---
+p('idp.status.fileUploaded')]]></ee:set-variable>
+					<ee:set-variable variableName="failure" ><![CDATA[%dw 2.0
+output application/json
+var errorPayload = if ( !isEmpty(error.suppressedErrors) ) (error.suppressedErrors[0]) else error
+---
+errorPayload.description]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<flow-ref doc:name="common-content-version-status-flow" doc:id="c6add237-682d-493c-88c5-75b1fb61df5a" name="common-content-version-status-flow" />
+		</on-error-continue>
+		<on-error-continue enableNotifications="false" logException="false" doc:name="On Error Continue" doc:id="b1e438f3-47a1-430b-b55f-4dc8fd1e64bd" type="HTTP:BAD_GATEWAY, HTTP:BAD_REQUEST, HTTP:CLIENT_SECURITY, HTTP:CONNECTIVITY, HTTP:FORBIDDEN, HTTP:INTERNAL_SERVER_ERROR, HTTP:METHOD_NOT_ALLOWED, HTTP:NOT_ACCEPTABLE, HTTP:NOT_FOUND, HTTP:PARSING, HTTP:RETRY_EXHAUSTED, HTTP:SECURITY, HTTP:SERVICE_UNAVAILABLE, HTTP:TIMEOUT, HTTP:TOO_MANY_REQUESTS, HTTP:UNAUTHORIZED, HTTP:UNSUPPORTED_MEDIA_TYPE">
+			<ee:transform doc:name="Content Version Status" doc:id="0001db3f-acf7-48f1-a37c-4133ec5e155b" >
+				<ee:message />
+				<ee:variables >
+					<ee:set-variable variableName="contentVersionStatus" ><![CDATA[%dw 2.0
+output application/json
+---
+null]]></ee:set-variable>
+					<ee:set-variable variableName="checkListLineStatus" ><![CDATA[%dw 2.0
+output application/json
+---
+p('idp.status.fileUploaded')]]></ee:set-variable>
+					<ee:set-variable variableName="failure" ><![CDATA[%dw 2.0
+output application/json
+var errorPayload = if ( !isEmpty(error.suppressedErrors) ) (error.suppressedErrors[0]) else error
+---
+errorPayload.description]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<flow-ref doc:name="common-content-version-status-flow" doc:id="6599f9a2-760c-4b9d-a9cd-a254afb4bed7" name="common-content-version-status-flow" />
+		</on-error-continue>
+		<on-error-continue enableNotifications="false" logException="false" doc:name="On Error Continue" doc:id="66696b01-29fb-4a03-84ad-c2da062d59fe" type="JSON:INVALID_INPUT_JSON, JSON:INVALID_SCHEMA, JSON:SCHEMA_NOT_FOUND, JSON:SCHEMA_NOT_HONOURED">
+			<ee:transform doc:name="Content Version Status" doc:id="1f9b4de3-f2a6-4481-9fab-c4a50e448f15">
+				<ee:message />
+				<ee:variables>
+					<ee:set-variable variableName="contentVersionStatus"><![CDATA[%dw 2.0
+output application/json
+---
+p('status.failed')]]></ee:set-variable>
+					<ee:set-variable variableName="contentVersionMessage"><![CDATA[%dw 2.0
+import * from dw::core::Strings
+output application/json
+---
+"Required Field missing : " ++ ((((substringBeforeLast(substringAfter(((error.description) replace /[$.]/ with ""), "["), "]"))) replace ": is missing but it is required" with "") replace ": does not have a value in the enumeration [YES]" with "")]]></ee:set-variable>
+					<ee:set-variable variableName="checkListLineStatus" ><![CDATA[%dw 2.0
+output application/json
+---
+p('idp.status.failed')]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<flow-ref doc:name="common-content-version-status-flow" doc:id="16eab9d8-92fb-450d-a0d6-7f235d4d72ec" name="common-content-version-status-flow" />
+		</on-error-continue>
+		<on-error-continue enableNotifications="false" logException="false" doc:name="On Error Continue" doc:id="aafe4749-dee6-49cb-bb37-215af6a236e9" type="IDP:LOW_CONFIDENCE_SCORE">
+			<ee:transform doc:name="Content Version Status" doc:id="6ca4f06c-3fdb-4bda-994b-c2af284bfb3e">
+				<ee:message />
+				<ee:variables>
+					<ee:set-variable variableName="contentVersionStatus"><![CDATA[%dw 2.0
+output application/json
+---
+p('status.failed')]]></ee:set-variable>
+					<ee:set-variable variableName="contentVersionMessage"><![CDATA[%dw 2.0
+output application/json
+---
+"Unable to Read, Provide clearer image or PDF: " ++ ((vars.hasLowConfidence distinctBy ((item, index) -> item)) joinBy  ", ")]]></ee:set-variable>
+					<ee:set-variable variableName="checkListLineStatus" ><![CDATA[%dw 2.0
+output application/json
+---
+p('idp.status.failed')]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<flow-ref doc:name="common-content-version-status-flow" doc:id="5a8e71ee-597e-482c-8454-d3668204c343" name="common-content-version-status-flow" />
+		</on-error-continue>
+		<on-error-continue enableNotifications="false" logException="false" doc:name="On Error Continue" doc:id="807a6407-ec2a-41d7-a297-e7ad03044e8e" type="ANY">
+			<ee:transform doc:name="Content Version Status" doc:id="6534c642-fd0c-46e1-baf2-410ee7f39e07">
+				<ee:message />
+				<ee:variables>
+					<ee:set-variable variableName="contentVersionStatus"><![CDATA[%dw 2.0
+output application/json
+---
+p('status.failed')]]></ee:set-variable>
+					<ee:set-variable variableName="contentVersionMessage"><![CDATA[%dw 2.0
+output application/json
+---
+error.description]]></ee:set-variable>
+					<ee:set-variable variableName="checkListLineStatus" ><![CDATA[%dw 2.0
+output application/json
+---
+p('idp.status.failed')]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<flow-ref doc:name="common-content-version-status-flow" doc:id="4505b8b5-8797-4a9b-91be-91531bed55f7" name="common-content-version-status-flow" />
+		</on-error-continue>
+	</error-handler>
+	<error-handler name="common-error-handler" doc:id="8ff8e99b-519c-4131-b799-ca088b36ca7e" >
+		<on-error-continue enableNotifications="false" logException="false" doc:name="On Error Continue" doc:id="6431f14c-6187-4a04-8879-15402a23f62a" type="ANY">
+			<ee:transform doc:name="Error Message" doc:id="5391c1f0-e381-4941-bda7-b46637821d0a" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+"CLAIM_PROCESSING_FAILED | ClaimNumber= " ++ vars.claimNumber ++ " | ClaimId= " ++ vars.claimId]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<logger level="INFO" doc:name="Log Error Message" doc:id="b4b6342c-36a3-4b19-8bc3-5ce3b2046f62" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;    "message": payload&#10;}]'/>
+		</on-error-continue>
+	</error-handler>
+</mule>

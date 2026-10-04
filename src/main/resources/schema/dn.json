@@ -1,0 +1,39 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "DN Request",
+	"type": "object",
+	"properties": {
+		"customerSignature": {
+			"type": "string",
+			"enum": ["YES"]
+		},
+		"deliveryChallanNumber": {
+			"type": "string"
+		},
+		"itemDetails": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": [
+					"itemName",
+					"quantity"
+				],
+				"properties": {
+					"itemName": {
+						"type": "string"
+					},
+					"quantity": {
+						"type": "string"
+					}
+				},
+				"additionalProperties": true
+			}
+		}
+	},
+	"required": [
+		"customerSignature",
+		"deliveryChallanNumber",
+		"itemDetails"
+	],
+	"additionalProperties": true
+}

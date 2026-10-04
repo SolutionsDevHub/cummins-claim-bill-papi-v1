@@ -1,0 +1,44 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"title": "Vendor Report",
+	"type": "object",
+	"properties": {
+		"vendorName": {
+			"type": "string"
+		},
+		"claimStatus": {
+			"type": "string"
+		},
+		"dealershipName": {
+			"type": "string"
+		},
+		"serviceOrderNumber": {
+			"type": "string"
+		},
+		"claimNumber": {
+			"type": "string"
+		},
+		"esn": {
+			"type": "string"
+		}
+	},
+	"anyOf": [
+		{
+			"required": [
+				"serviceOrderNumber"
+			]
+		},
+		{
+			"required": [
+				"claimNumber"
+			]
+		},
+		{
+			"required": [
+				"esn"
+			]
+		}
+	],
+	"additionalProperties": true
+}
+

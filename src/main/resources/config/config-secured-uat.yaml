@@ -1,0 +1,23 @@
+# use this file for encrypted user/password information.
+# Unencrypted values may be used in this file using standard yaml syntax
+# Encrypted values must be enclosed in ![] within the quotes.
+
+# Salesforce Credentails
+salesforce:
+    clientId: "![3GWCN8gcW4tMikWzgkVNFdUguv6B2joghdbsFJ9W0AQODwBHkgqv4QDmr9g2CRZ9o8V4857wkAtuEH8TnyQ2vtx4uynOskRaukXaWCrvVFvtIVKJciANkGU/l/tC6cjo]"
+    clientSecret: "![rlX7ZhXvcVFxSBgqSe/9DDfor7R1BF/ytJwyRBBLF0H5C9gDwHb2z0XM1eqbs3QkcobhihufzjoBd/usEVJ3En+bIbM4Nb9uBc/Zt00RtdU=]"
+
+# IDP Configurations
+idp:
+    clientId: "![qJyCU+AgrDYRbzRyY5+JmyfyFXLZkeTaQshm/qgm7tZfcCoSopbUSVRIqQtx2bfq]"
+    clientSecret: "![uEjY5o0BPgpV6wWvzicSQgua4u4gL8uHDFntzx8zq/JNIcgkswbRGAIOz3vmbqqk]"
+    orgId: "![Vw2CMloyzv0ipn0+pFhkMjBC1gWdsQDwV+SoItfJbsAHiqAPG9LrWrcVjmFUo8og]"
+    actionId:
+        fsr: "![UXDKm8NyCDnqyXyd/5mWtdm0CyDQT/ETbhN9DiYF0wF6ja/PYxx5La06B0HcN2QN]"
+        dn: "![O22g8ijjWgEiYM/uKZu1aB9o2Ael73t9oqjxDdL1RjAR4mHm8lPODt5dlFwCPoGd]"
+        fir: "![2YCJqvPXOjVXlWZACa9cx4FGkaPT4kGx5BVkIG13ms+/zAYjQgHPjAATg3T2zxI/]"
+        invoice: "![/cMKOrKFoDNtudITIszjpzZmhqnl19yiiR3knLYiMgZwgWHiP1n2j+OZQh11tuPb]"
+        analysisReport: "![CI/iLdhoEbOBvz2FlvPXpeU29GzvmGeemSBzgtIXmHmU2m+8rmWQ6+FFTlPCqR8+]"
+        vendorReport: "![bEiyjJrNLM6p04qj1XFAh0VWtkFAKam6FKeo2SY1pxiQPead2L1FDmmXfEFNNe1Z]"
+        ecmImage: "![iW+qSB8Pjyp6brr6COT52FffyZocCyaGp2qu5rQKgpOgkgvuCq9c9pXA1g/nPtJ3]"
+

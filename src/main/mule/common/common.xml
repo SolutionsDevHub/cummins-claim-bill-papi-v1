@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<sub-flow name="idp-get-flow" doc:id="1f994075-529a-422a-bd9b-53b2c1621e0e" >
+		<logger level="INFO" doc:name="Request Logger" doc:id="85382f7d-5b5c-44d7-a514-aac640a66de3" message='#[output application/json --- {&#10;	"message": "Before invoking the GET request from IDP on document action " ++ (lower(vars.doc.actionName)),&#10;	"fileName": vars.document.fileName&#10;}]' />
+		<until-successful maxRetries="${retry.idp.numRetries}" doc:name="Retry" doc:id="19e2f355-d6d8-4f9f-9423-1618f925fc7d" millisBetweenRetries="${retry.idp.delayMillisecs}">
+			<http:request method="GET" doc:name="IDP Get Request" doc:id="95eb1dd5-684e-45ed-9785-f6959ba0a0d6" config-ref="IDP_Request_configuration" path="${idp.getPath}">
+					<http:uri-params><![CDATA[#[output application/java
+---
+{
+	executionId : payload.id,
+	"orgId" : p('secure::idp.orgId'),
+	"version" : vars.doc.version, 
+	"actionId" : vars.doc.actionId
+}]]]></http:uri-params>
+					<http:query-params><![CDATA[#[output application/java
+---
+{
+	"valueOnly" : p('idp.queryParam.valueOnly')
+}]]]></http:query-params>
+				</http:request>
+			<choice doc:name="Choice" doc:id="dc2bf660-8bd3-4fd8-bd8f-5d1bbc57775f">
+			<when expression='#[(payload.status== "IN_PROGRESS") or (payload.status== "ACKNOWLEDGED") or (payload.status== "RESULTS_PENDING") or (payload.status== "PARTIAL_SUCCESS")]'>
+				<raise-error doc:name="IDP:PROCESSING_FAILURE" doc:id="74667ec1-30b8-4749-9407-f7b4244ebd5e" type="IDP:PROCESSING_FAILURE" description="IDP execution is still in progress; extraction not completed"/>
+			</when>
+				<otherwise >
+					<logger level="INFO" doc:name="Response Logger" doc:id="eb03cfd2-e983-437e-98b4-4f6bd7e33140" message='#[output application/json --- {&#10;	"message": "After invoking the GET request from IDP on document action " ++ (lower(vars.doc.actionName)),&#10;	"fileName": vars.document.fileName&#10;}]' />
+				</otherwise>
+		</choice>
+		</until-successful>
+	</sub-flow>
+	<sub-flow name="idp-post-flow" doc:id="211f39b7-8113-4dfe-a30e-11e459f15e45" >
+		<logger level="INFO" doc:name="Request Logger" doc:id="2ffbfd09-57dd-4189-9c4f-1abe1cfa6fe7" message='#[output application/json --- {&#10;	"message": "Before invoking the POST request from IDP on document action " ++ (lower(vars.doc.actionName)),&#10;	"fileName": vars.document.fileName&#10;}]' />
+		<until-successful maxRetries="${retry.numRetries}" doc:name="Retry" doc:id="6538adef-e5b7-4369-9eb7-22eddb4f87b5" millisBetweenRetries="${retry.delayMillisecs}">
+			<http:request method="POST" doc:name="POST IDP Request" doc:id="84d56efd-3958-4f80-b6f6-98119b85d2b5" path="${idp.postPath}" config-ref="IDP_Request_configuration" responseTimeout="${http.timeout}">
+			<http:uri-params><![CDATA[#[output application/java
+---
+{
+	"orgId" : p('secure::idp.orgId'),
+	"version" : vars.doc.version, 
+	"actionId" : vars.doc.actionId
+}]]]></http:uri-params>
+		</http:request>
+		</until-successful>
+		<logger level="INFO" doc:name="Response Logger" doc:id="68a3d35e-f79c-4824-b333-164c9d4c8168" message='#[output application/json --- {&#10;	"message": "After invoking the POST request from IDP on document action " ++ (lower(vars.doc.actionName)),&#10;	"fileName": vars.document.fileName&#10;}]' />
+	</sub-flow>
+	<sub-flow name="salesforce-search-flow" doc:id="8efee3bf-f6aa-400b-b1db-7b9197cd6597" >
+		<logger level="INFO" doc:name="Request Logger" doc:id="2fedbca6-859c-40c4-b165-b50f8da6a0dd" message='#[output application/json --- {&#10;	"message": "Request sent to fetch the " ++ vars.object ++ " data from salesforce",&#10;	("contentDocumentId": vars.document.contentDocumentId) if(!isEmpty(vars.document.contentDocumentId)),&#10;	("fileName": vars.document.fileName) if(!isEmpty(vars.document.fileName))&#10;}]' />
+		<until-successful maxRetries="${retry.numRetries}" doc:name="Retry" doc:id="1b0fe379-296a-4a05-b80e-3d3d619605aa" millisBetweenRetries="${retry.delayMillisecs}">
+			<salesforce:query doc:name="Query Content Version" doc:id="dece2dbb-0891-459a-91fb-703251bec092" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query ><![CDATA[#[vars.search.query]]]></salesforce:salesforce-query>
+				<salesforce:parameters><![CDATA[#[vars.search.parameters]]]></salesforce:parameters>
+		</salesforce:query>
+		</until-successful>
+		<logger level="INFO" doc:name="Response Logger" doc:id="b96c25a7-88ca-4b0b-afd7-bbe963a47eb2" message='#[output application/json --- {&#10;	"message": "Response received for " ++ vars.object ++ " data from salesforce"&#10;}]' />
+	</sub-flow>
+	<sub-flow name="salesforce-create-flow" doc:id="71d6fba8-be7d-419f-994f-d17c8f054e66" >
+		<logger level="INFO" doc:name="Request Logger" doc:id="67428c5f-ce73-44cf-8043-27b86e906c44" message='#[output application/json --- {&#10;	"message": "Request sent to create record in " ++ vars.object ++  if(vars.object != "Task") (" for " ++ lower(vars.doc.documentType)) else "",&#10;	("contentDocumentId": vars.document.contentDocumentId) if(vars.object != "Task"),&#10;	("fileName": vars.document.fileName) if(vars.object != "Task")&#10;}]' />
+		<until-successful maxRetries="${retry.numRetries}" doc:name="Retry" doc:id="e28babb0-fe72-44fe-96ed-9e901d473f46" millisBetweenRetries="${retry.delayMillisecs}">
+			<salesforce:create doc:name="Create Records" doc:id="459a02df-894b-458a-a55f-14198e8f3850" config-ref="Salesforce_Config" type="#[vars.object]" />
+		</until-successful>
+		<logger level="INFO" doc:name="Response Logger" doc:id="e1d56e47-81ee-4d15-9a7f-9833f965ca94" message='#[output application/json --- {&#10;	"message": "Response received after creation of the record in " ++ vars.object  ++ if(vars.object != "Task") (" for " ++ lower(vars.doc.documentType)) else ""&#10;}]' />
+	</sub-flow>
+	<sub-flow name="salesforce-update-flow" doc:id="d5477d6f-46e4-430b-a04d-96ef13ce9de0" >
+		<logger level="INFO" doc:name="Request Logger" doc:id="8cf5ba19-4ca9-46ef-b00d-e3d492ed4c90" message='#[output application/json&#10;---&#10;{&#10;	"message": "Request sent to update status of " ++ vars.objectName ++ " in salesforce",&#10;	("contentDocumentId": vars.document.contentDocumentId) if(vars.objectName == "content version"),&#10;	("checklistLineId": vars.document.checklistLineId) if(vars.objectName == "check list line"),&#10;	("fileName": vars.document.fileName) if(vars.objectName != "claim"),&#10;	("status": if ( vars.objectName == "content version" ) vars.contentVersionStatus else vars.checkListLineStatus) if(vars.objectName != "claim")&#10;}]' />
+		<until-successful doc:name="Retry" doc:id="29dffee3-7d04-464e-8cfe-30adc2745f9b" millisBetweenRetries="${retry.delayMillisecs}" maxRetries="${retry.numRetries}">
+			<salesforce:update type="#[vars.object]" doc:name="Update Content Version" doc:id="f9d89efc-7c22-4286-bda5-be58b5ce933e" config-ref="Salesforce_Config" />
+		</until-successful>
+		<logger level="INFO" doc:name="Response Logger" doc:id="42495547-cf23-4134-b429-7298471965fa" message='#[output application/json --- {&#10;	"message": "Response received for " ++ vars.objectName  ++ " status updated from salesforce"&#10;}]'/>
+	</sub-flow>
+	<sub-flow name="common-content-version-status-flow" doc:id="6b652f1b-f6f6-4d38-9581-3643a26d5136" >
+		<logger level="INFO" doc:name="Logging Content Version Message" doc:id="fb8035a2-e73f-4ca8-a730-59d7a2a62be7" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	"message": if ( !isEmpty(vars.contentVersionMessage) ) vars.contentVersionMessage else if ( !isEmpty(vars.failure) ) vars.failure else "Document has been processed successfully",&#10;	"fileName": vars.document.fileName,&#10;}]'/>
+		<ee:transform doc:name="Content Version Status" doc:id="126bd77d-6b36-4d5d-9dcf-fa40e9b81685" >
+			<ee:message >
+				<ee:set-payload resource="dwl/contentVersionStatusUpdate.dwl" />
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="object" ><![CDATA[%dw 2.0
+output application/json
+---
+p('salesforce.contentVersionObject')]]></ee:set-variable>
+				<ee:set-variable resource="dwl/task.dwl" variableName="task" />
+				<ee:set-variable variableName="objectName" ><![CDATA[%dw 2.0
+output application/json
+---
+p('contentVersion')]]></ee:set-variable>
+				<ee:set-variable variableName="failureReason" ><![CDATA[%dw 2.0
+output application/json
+---
+(vars.failureReason default [] ++ [{
+	"fileName": vars.document.fileName,
+	"message": vars.failure
+}]) filter ((item, index) -> !isEmpty(item.message))]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="salesforce-update-flow" doc:id="707b64bc-ad50-43ac-b74d-fab53f5ca2b1" name="salesforce-update-flow" />
+		<logger level="INFO" doc:name="Logging Content Version Status" doc:id="466bff89-7ca4-4fc0-9543-1e2a2dfd41a6" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;    "message": "Document content version status updated successfully",&#10;	"fileName": vars.document.fileName,&#10;	"status": payload.successful&#10;}]' />
+		<ee:transform doc:name="Check List Processing Status" doc:id="f516e835-f8c9-46e9-93c2-41645ae8d048">
+			<ee:message>
+				<ee:set-payload resource="dwl/checkListLineStatusUpdate.dwl" />
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="object" ><![CDATA[%dw 2.0
+output application/json
+---
+p('salesforce.checkListLines')]]></ee:set-variable>
+				<ee:set-variable variableName="objectName" ><![CDATA[%dw 2.0
+output application/json
+---
+p('checklistLine')]]></ee:set-variable>
+				<ee:set-variable variableName="fileStatus" ><![CDATA[%dw 2.0
+output application/json
+---
+(vars.fileStatus default [] ++ [{
+	"fileName": vars.document.fileName,
+	"status": if ( vars.contentVersionStatus == p('status.failed') ) "Failed" else "Success"
+}]) filter ((item, index) -> item.status == "Success")]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="salesforce-update-flow" doc:id="29a44244-9eb6-4f28-8079-319977c9e429" name="salesforce-update-flow"/>
+		<logger level="INFO" doc:name="Logging Check List Line Status" doc:id="1930d52c-ae82-4326-9f34-0b337fe8c63e" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;    "message": "Document check list line status updated successfully",&#10;	"fileName": vars.document.fileName,&#10;	"status": payload.successful&#10;}]'/>
+	</sub-flow>
+</mule>

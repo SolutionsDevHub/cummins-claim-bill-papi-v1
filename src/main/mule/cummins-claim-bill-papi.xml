@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:pdfbox="http://www.mulesoft.org/schema/mule/pdfbox" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/pdfbox http://www.mulesoft.org/schema/mule/pdfbox/current/mule-pdfbox.xsd">
+    <flow name="cummins-claim-bill-papi-main">
+        <http:listener config-ref="cummins-claim-bill-papi-httpListenerConfig" path="${http.listener.path}">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body><![CDATA[#[payload]]]></http:body>
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:error-response>
+        </http:listener>
+		<apikit:router config-ref="cummins-claim-bill-papi-config" />
+		<error-handler>
+            <on-error-propagate type="APIKIT:BAD_REQUEST">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Bad request"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Method not allowed"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">405</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not acceptable"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">406</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Unsupported media type"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">415</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_IMPLEMENTED">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not Implemented"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">501</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="post:\claims:application\json:cummins-claim-bill-papi-config">
+		<logger level="DEBUG" doc:name="Debug Logger Payload" doc:id="19c2f4da-f99e-4733-8712-07308caa624a" message="#[%dw 2.0&#10;output application/json&#10;---&#10;payload]" category="com.cummins.idp.integration.payload"/>
+		<ee:transform doc:name="Claim and Service Order Number Variables" doc:id="c10d1f96-44a2-4f67-8542-2d14e3fadf44">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="serviceOrderId"><![CDATA[%dw 2.0
+output application/json
+---
+payload.repairOrderId]]></ee:set-variable>
+				<ee:set-variable variableName="claimId"><![CDATA[%dw 2.0
+output application/json
+---
+payload.claimId]]></ee:set-variable>
+				<ee:set-variable variableName="claimNumber" ><![CDATA[%dw 2.0
+output application/json
+---
+payload.claimNumber]]></ee:set-variable>
+				<ee:set-variable variableName="startTime" ><![CDATA[%dw 2.0
+output application/json
+---
+now()]]></ee:set-variable>
+				<ee:set-variable variableName="triggeringUserId" ><![CDATA[%dw 2.0
+output application/json
+---
+payload.triggeringUserId]]></ee:set-variable>
+			
+</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logging Claim/Bill Number" doc:id="fbe21298-c79c-4567-8db1-37b95dfadb03" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	"serviceOrderId": vars.serviceOrderId,&#10;	"claimNumber": vars.claimNumber,&#10;	"claimId": vars.claimId,&#10;}]' />
+		<async doc:name="Async" doc:id="bd9d109b-07af-44e8-8554-15bbad08972c" >
+			<try doc:name="Try" doc:id="77b78cb0-3245-4a6c-bbfa-4b8a93599032" >
+				<flow-ref doc:name="claim-bill-impl-flow" doc:id="240cc46e-b777-48af-97fe-0ce200c81c3e" name="claim-bill-impl-flow" />
+				<error-handler ref="common-error-handler" />
+			</try>
+		</async>
+		<ee:transform doc:name="Output Payload">
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"status": "Success",
+	"message": "Documents has been forwarded to IDP for processing."
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+</mule>

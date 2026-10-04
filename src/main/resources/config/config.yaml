@@ -1,0 +1,111 @@
+# Common properties shared across all environments
+
+# HTTP Listener Config
+http:
+    timeout: "60000"
+    listener:
+        host: "0.0.0.0"
+        port: "8081"
+        readTimeOut: "30000"
+        path: "/api/v1/*"
+
+# Reconnection strategy
+reconnect:
+    frequency: "5000"
+    count: "3"
+
+# Retry configuration
+retry:
+    delayMillisecs: "5000"
+    numRetries: "3"
+    idp:
+        delayMillisecs: "5000"
+        numRetries: "12"
+
+# Object Store configuration
+objectStore:
+    ttl: "24"
+    tte: "1"
+
+
+# Confidence Score Threshold
+confidenceScoreThreshold: "90"
+exceptionConfidenceScoreThreshold: "80"
+
+# Content Version Status:
+status:
+    pass: "Pass"
+    failed: "Failed"
+
+# IDP Configurations
+idp:
+    host: "idp-rt.us-east-1.anypoint.mulesoft.com"
+    port: "443"
+    protocol: "HTTPS"
+    tokenUrl: "https://anypoint.mulesoft.com/accounts/api/v2/oauth2/token"
+    status:
+        success: "IDP Processed"
+        failed: "IDP Failed"
+        fileUploaded: "File Uploaded"
+    postPath: "/v1/organizations/{orgId}/actions/{actionId}/versions/{version}/execution"
+    getPath: "/v1/organizations/{orgId}/actions/{actionId}/versions/{version}/executions/{executionId}"
+    queryParam:
+        valueOnly: "false"
+    version:
+        fsr: "1.12.0"
+        dn: "1.10.0"
+        fir: "1.9.0"
+        invoice: "1.5.0"
+        analysisReport: "1.4.0"
+        vendorReport: "1.4.0"
+        ecmImage: "1.4.0"
+    actionName:
+        fsr: "Field Service Report Extraction"
+        dn: "Delivery Challan And Note Extraction"
+        fir: "Failure Investigation Report Extraction"
+        invoice: "Invoice Extraction"
+        analysisReport: "Analysis Report Extraction"
+        vendorReport: "Vendor Report Extraction"
+        ecmImage: "ECM Image Data Extraction"
+    documentType:
+        fsr: "fsr"
+        dn: "dn"
+        fir: "fir"
+        invoice: "invoice"
+        analysisReport: "analysisReport"
+        vendorReport: "vendorReport"
+        ecmImage: "ecmImage"
+
+# Salesforce Credentails
+salesforce:
+    checkListLines: "dmpl__CheckListLines__c"
+    claim: "dmpl__Claim__c"
+    fileDataStagingObject: "IDP_File_Data_Staging__c"
+    itemDetailObject: "IDP_Item_Detail__c"
+    taskObject: "Task"
+    contentVersionObject: "ContentVersion"
+    contentVersionQuery: "Select Id, ContentDocumentId, VersionData from ContentVersion WHERE ContentDocumentId = ':Id'"
+    taskQuery: "Select Id, Status, SubStatus__c from Task where Status != 'Closed' and What.Id = ':Id'"
+    checkListLineQuery: "Select Id, dmpl__RepairOrderId__c, dmpl__CheckListTemplateLineId__r.Name FROM dmpl__CheckListLines__c WHERE Processing_Status__c = 'File Uploaded' and dmpl__CheckListTemplateLineId__r.Name In ('Manual FSR','DC/DN Signed & Stamped Receipt','FIR','Local / Proforma Invoice','Coolant, Fuel, Oil Analysis Report','ECM Image','Vendor Report/Vendor Rejection Letter')"
+    ContentDocumentLinkQuery: "SELECT Id, LinkedEntityId, ContentDocumentId, ContentDocument.Title, ContentDocument.LatestPublishedVersion.Id  FROM ContentDocumentLink Where LinkedEntityId IN :Id"
+    claimQuery: "SELECT Id, DocumentReference__c, dmpl__RepairOrderId__c FROM dmpl__Claim__c WHERE dmpl__Status__c = 'Reverted' and dmpl__RepairOrderId__c In :Id"
+    document:
+        fsrLabel: "Manual FSR"
+        dnLabel: "DC/DN Signed & Stamped Receipt"
+        firLabel: "FIR"
+        invoiceLabel: "Local / Proforma Invoice"
+        analysisReportLabel: "Coolant, Fuel, Oil Analysis Report"
+        vendorReportLabel: "Vendor Report/Vendor Rejection Letter"
+        ecmImageLabel: "ECM Image"
+
+# Task
+task:
+    priority: "Normal"
+    status: "Open"
+    subject: "Data Validation Failed"
+
+# Objects:
+claim: "claim"
+contentVersion: "content version"
+checklistLine: "check list line"
+ContentDocumentLink: "content document link"

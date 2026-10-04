@@ -1,0 +1,425 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:pdfbox="http://www.mulesoft.org/schema/mule/pdfbox"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:chunking="http://www.mulesoft.org/schema/mule/chunking"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/pdfbox http://www.mulesoft.org/schema/mule/pdfbox/current/mule-pdfbox.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd">
+	<sub-flow name="claim-bill-impl-flow" doc:id="b9f2e191-b431-4e0b-99e4-308da647d151">
+		<logger level="INFO" doc:name="Start Logger" doc:id="71535fc9-d9e5-4d56-9989-ab6f6dbc1373" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	"message": "Started IDP document processing for data extraction",&#10;	"timeStamp": vars.startTime&#10;}]'/>
+		<foreach doc:name="Iterate Over Each Document" doc:id="bd8bdd3b-2992-443b-bc86-5b9de66f431f" collection="#[payload.documents]">
+			<try doc:name="Try" doc:id="82c5834a-b22b-41d0-ad47-a34a43e58bdb" >
+				<logger level="INFO" doc:name="Logging Input Payload" doc:id="21cdca76-bf81-412d-941f-0447b07b2f97" message="#[%dw 2.0&#10;output application/json&#10;---&#10;payload]"/>
+				<flow-ref doc:name="claim-bill-idp-post-impl-flow" doc:id="9003f263-005d-4107-9c8e-7ff0c6760969" name="claim-bill-idp-post-impl-flow" />
+				<error-handler ref="global-error-handler" />
+			</try>
+		
+</foreach>
+		<choice doc:name="Choice" doc:id="756933b0-ffb8-469c-afb0-da4df8800164" >
+			<when expression="#[!isEmpty(vars.task)]">
+				<logger level="INFO" doc:name="Logging Records Status" doc:id="45c6ad6a-76e6-40bf-80e2-f798780615de" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	"status": "Failed",&#10;	"claimNumber": vars.claimNumber,&#10;	"message": "Records processing failed due to data issues"&#10;}]'/>
+				<flow-ref doc:name="task-creation-flow" doc:id="aafd4a2c-e42a-4487-bcb0-dbad9dccce47" name="task-creation-flow"/>
+				
+			</when>
+			<when expression="#[!isEmpty(vars.failureReason)]">
+				<logger level="INFO" doc:name="Logging Records Status" doc:id="67a39f7e-41c8-42d4-86e7-6231072a66e4" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	"status": "Failed",&#10;	"claimNumber": vars.claimNumber,&#10;	"message": "Records processing failed due to connectivity issues"&#10;}]'/>
+				<flow-ref doc:name="claim-status-update-flow" doc:id="79cb8e2d-15a6-4f68-87e9-2e9359aa5a03" name="claim-status-update-flow"/>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logging All Files Success Status" doc:id="566d151e-2d7c-4163-8aca-3195c22f1237" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	"status": "Success",&#10;	"claimNumber": vars.claimNumber,&#10;	"message": "All the documents were processed successfully"&#10;}]'/>
+				<flow-ref doc:name="claim-status-update-flow" doc:id="b01127dc-c9c0-4306-a5d9-5a4d7e18b6f0" name="claim-status-update-flow"/>
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="End Logger" doc:id="4445e9d0-9184-4c5b-aa97-7dbddd296814" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	"message": "Completed IDP document processing for data extraction",&#10;	"timeStamp": now(),&#10;	"processingtime(minutes)": (now() - vars.startTime).minutes&#10;}]'/>
+	
+</sub-flow>
+	<sub-flow name="claim-bill-idp-post-impl-flow" doc:id="47762350-060f-4194-9775-c0cb3a504e0b">
+		<ee:transform doc:name="Document Variables" doc:id="74686422-3e47-4764-8af2-5eac5f009638" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="document" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+				<ee:set-variable variableName="doc" ><![CDATA[%dw 2.0
+output application/json
+---
+((payload.label) match {
+	case str if str == p('salesforce.document.fsrLabel') -> {
+		"documentType": p('idp.documentType.fsr'),
+		"actionName": p('idp.actionName.fsr'),
+		"actionId": p('secure::idp.actionId.fsr'),
+		"version": p('idp.version.fsr')
+	}
+    case str if str == p('salesforce.document.dnLabel') -> {
+		"documentType": p('idp.documentType.dn'),
+		"actionName": p('idp.actionName.dn'),
+		"actionId": p('secure::idp.actionId.dn'),
+		"version": p('idp.version.dn')
+	}
+    case str if str == p('salesforce.document.firLabel') -> {
+		"documentType": p('idp.documentType.fir'),
+		"actionName": p('idp.actionName.fir'),
+		"actionId": p('secure::idp.actionId.fir'),
+		"version": p('idp.version.fir')
+	}
+    case str if str == p('salesforce.document.invoiceLabel') -> {
+		"documentType": p('idp.documentType.invoice'),
+		"actionName": p('idp.actionName.invoice'),
+		"actionId": p('secure::idp.actionId.invoice'),
+		"version": p('idp.version.invoice')
+	}
+    case str if str == p('salesforce.document.analysisReportLabel') -> {
+		"documentType": p('idp.documentType.analysisReport'),
+		"actionName": p('idp.actionName.analysisReport'),
+		"actionId": p('secure::idp.actionId.analysisReport'),
+		"version": p('idp.version.analysisReport')
+	}
+    case str if str == p('salesforce.document.vendorReportLabel') -> {
+		"documentType": p('idp.documentType.vendorReport'),
+		"actionName": p('idp.actionName.vendorReport'),
+		"actionId": p('secure::idp.actionId.vendorReport'),
+		"version": p('idp.version.vendorReport')
+	}
+    case str if str == p('salesforce.document.ecmImageLabel') -> {
+		"documentType": p('idp.documentType.ecmImage'),
+		"actionName": p('idp.actionName.ecmImage'),
+		"actionId": p('secure::idp.actionId.ecmImage'),
+		"version": p('idp.version.ecmImage')
+	}
+	else -> {
+	}
+})]]></ee:set-variable>
+				<ee:set-variable variableName="idpItemDetailResponse" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+}]]></ee:set-variable>
+				<ee:set-variable variableName="idpFileDataStagingResponse" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+}]]></ee:set-variable>
+				<ee:set-variable variableName="contentVersionMessage" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+}]]></ee:set-variable>
+				<ee:set-variable variableName="contentVersionStatus" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+}]]></ee:set-variable>
+				<ee:set-variable variableName="hasLowConfidence" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+}]]></ee:set-variable>
+				<ee:set-variable variableName="confidenceScoreType" ><![CDATA[%dw 2.0
+output application/json
+---
+(payload.label) match {
+	case str if str == p('salesforce.document.fsrLabel') -> "exceptionConfidenceScore"
+	case str if str == p('salesforce.document.dnLabel') -> "exceptionConfidenceScore"
+    case str if str == p('salesforce.document.firLabel') -> "exceptionConfidenceScore"
+    else -> "allConfidenceScore"
+}]]></ee:set-variable>
+				<ee:set-variable variableName="search" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"query": p('salesforce.contentVersionQuery'),
+	"parameters": {
+		"Id": payload.contentDocumentId
+	}
+}]]></ee:set-variable>
+				<ee:set-variable variableName="object" ><![CDATA[%dw 2.0
+output application/json
+---
+p('contentVersion')]]></ee:set-variable>
+				<ee:set-variable variableName="failure" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<choice doc:name="Choice" doc:id="e5d2b003-5245-4c06-8977-9cbaf7782fd0" >
+			<when expression="#[!isEmpty(vars.doc)]">
+				<flow-ref doc:name="salesforce-search-flow" doc:id="35eb876a-c011-4fb4-aae1-07e5d6cba7ab" name="salesforce-search-flow" />
+				<choice doc:name="Choice" doc:id="3e78708f-dda7-4c88-886f-5dc115b00588">
+			<when expression="#[!isEmpty(payload.VersionData)]">
+				<ee:transform doc:name="Input Payload For IDP Extraction" doc:id="907f9a50-f9e3-4d17-9ece-57781f1e1a7f">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"fileName": vars.document.fileName,
+	"file": payload[0].VersionData
+}
+]]></ee:set-payload>
+			</ee:message>
+			<ee:variables>
+
+			
+</ee:variables>
+		</ee:transform>
+				<flow-ref doc:name="idp-post-flow" doc:id="e9c811a1-e5e1-44d2-b6f6-093db3784236" name="idp-post-flow" />
+				<ee:transform doc:name="Wait for 20 Sec" doc:id="d281b93a-498e-4e57-87af-d99747ba4018">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+import * from dw::Runtime
+output application/json
+---
+payload wait 10000]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="idp-get-flow" doc:id="e333d80e-05e2-4724-91bf-998b3c9971e1" name="idp-get-flow" />
+						<ee:transform doc:name="Output Payload From IDP Extraction" doc:id="476838a7-8ea6-4008-ae1f-66dcdfafcf44">
+					<ee:message>
+								<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+((payload.fields pluck ((value, key, index) -> {
+	((key) : value.value) if(!isEmpty(value.value)),
+	((key ++ "ConfidenceScore") : value.confidenceScore) if(!isEmpty(value.value))
+}) reduce ((item, accumulator) -> item ++ accumulator))) ++ ((payload.tables mapObject ((value, key, index) -> {
+	(key) : (value map ((item, index) -> item pluck ((v, k, i) -> {
+		((k) : v.value) if(!isEmpty(v.value)),
+		((k ++ "ConfidenceScore") : v.confidenceScore) if(!isEmpty(v.value))
+	}) reduce ((item, accumulator) -> accumulator ++ item)))
+})))]]></ee:set-payload>
+					</ee:message>
+					<ee:variables>
+								<ee:set-variable variableName="confidenceScores" ><![CDATA[%dw 2.0
+output application/json
+---
+((payload.fields pluck ((value, key, index) -> {
+	((key) : value.value) if(!isEmpty(value.value)),
+	(("confidenceScore") : value.confidenceScore) if(!isEmpty(value.value))
+})) ++ 
+(flatten(flatten(payload.tables pluck ((value, key, index) -> value)) map ((item, index) -> item pluck ((v, k, i) -> {
+	((k) : v.value) if(!isEmpty(v.value)),
+	(("confidenceScore") : v.confidenceScore) if(!isEmpty(v.value))
+}))))) filter ((item, index) -> !isEmpty(item))]]></ee:set-variable>
+								<ee:set-variable variableName="tables" ><![CDATA[%dw 2.0
+output application/json
+---
+(flatten(payload.tables pluck ((value, key, index) -> value))) map ((item, index) -> item pluck ((value, key, index) -> {
+	(key) : value.value,
+	((key ++ "ConfidenceScore") : value.confidenceScore) if(!isEmpty(value.value))
+}) reduce ((item, accumulator) -> accumulator ++ item))]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+						<logger level="DEBUG" doc:name="Payload Debug Logger" doc:id="843eab53-73bb-42da-ae16-2892ee262939" message="#[%dw 2.0&#10;output application/json&#10;---&#10;payload]" category="com.cummins.idp.integration.payload"/>
+						<flow-ref doc:name="claim-bill-idp-salesforce-flow" doc:id="685fb8ae-59a7-4872-8010-c2fab257ec22" name="claim-bill-idp-salesforce-flow"/>
+			
+</when>
+			<otherwise>
+						<set-variable value='#["No file data found for the label : " ++ vars.document.label]' doc:name="Content Version Message Variable" doc:id="2d6eb581-a376-4c72-92aa-1426ca92105d" variableName="contentVersionMessage" />
+						<set-variable value="#[p('status.failed')]" doc:name="Content Version Status Variable" doc:id="ba62016c-6ab0-4d48-92c4-6ac10fd19b60" variableName="contentVersionStatus" />
+						<set-variable value="#[p('idp.status.failed')]" doc:name="Check List Line  Status Variable" doc:id="059aa076-3957-4ad7-be18-dd2082f2b79d" variableName="checkListLineStatus"/>
+						<flow-ref doc:name="common-content-version-status-flow" doc:id="a3b10b95-4d65-4e26-b4c1-597b12e7311b" name="common-content-version-status-flow"/>
+						<logger level="INFO" doc:name="Empty File Label Names" doc:id="e68ca493-f4d1-47e4-bd93-698dc0fdb198" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;    "message": vars.contentVersionMessage&#10;}]' />
+			
+</otherwise>
+		</choice>
+			</when>
+			<otherwise >
+				<set-variable value='#[vars.document.label ++ " is not included in the list of files to be processed by IDP"]' doc:name="Content Version Message Variable" doc:id="523c77bd-b016-4052-a97c-a3f6782c496e" variableName="contentVersionMessage"/>
+				<set-variable value="#[p('status.failed')]" doc:name="Content Version Status Variable" doc:id="43f52ec8-deba-4db4-9734-a44af553c891" variableName="contentVersionStatus" />
+				<set-variable value="#[p('idp.status.failed')]" doc:name="Check List Line  Status Variable" doc:id="7e15cb8e-3b0a-4cb1-ba1a-9cf8397cca0d" variableName="checkListLineStatus"/>
+				<flow-ref doc:name="common-content-version-status-flow" doc:id="3b5b8727-cba5-4349-aa4c-92c290faaea0" name="common-content-version-status-flow"/>
+				<logger level="INFO" doc:name="Non IDP Processing File  Label  Names" doc:id="1a2d83a2-6296-43df-94f4-ef7e112a89f2" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;    "message": vars.contentVersionMessage&#10;}]'/>
+			</otherwise>
+		</choice>
+	</sub-flow>
+	<sub-flow name="claim-bill-idp-salesforce-flow" doc:id="9ac32a08-19fe-414f-b2b1-10ed3e65bf14" >
+		<choice doc:name="Choice" doc:id="e874b4b2-4395-4491-8886-79a52612d219" >
+			<when expression="#[!isEmpty(payload)]" >
+				<flow-ref doc:name="validation-json-schema-flow" doc:id="38893cb6-fb94-405d-b406-cdc0f6fcc667" name="validation-json-schema-flow" />
+				<ee:dynamic-evaluate doc:name="Mapping Request Dynamic Based On Label" doc:id="e8f80227-ac07-4139-9dd9-f818a4d7ad61" expression="#[readUrl('classpath://dwl/$(vars.doc.documentType).dwl', 'application/java')]"/>
+				<ee:transform doc:name="IDP File Data Staging Request Payload" doc:id="74c149df-45c8-41ee-b796-624edb277137" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[payload ++ 
+	{
+	"Name": if ( upper(vars.doc.documentType) == "DN" ) "DC/DN" else upper(vars.doc.documentType),
+	"Claim__c": vars.claimId,
+	"Checklist_Line__c": vars.document.checklistLineId,
+	"File_Name__c": vars.document.fileName,
+	"Related_Document_Id__c": vars.document.contentDocumentId,
+	"Status__c": p('idp.status.success')
+}]]]></ee:set-payload>
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="object" ><![CDATA[%dw 2.0
+output application/json
+---
+p('salesforce.fileDataStagingObject')]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="DEBUG" doc:name="Payload Debug Logger" doc:id="3b6f62b2-f874-4e9c-96bc-6cb69ad37266" message="#[%dw 2.0&#10;output application/json&#10;---&#10;payload]" category="com.cummins.idp.integration.payload" />
+				<flow-ref doc:name="salesforce-create-flow" doc:id="ac1e0db6-1740-4217-b8ad-8cf10d091862" name="salesforce-create-flow" target="idpFileDataStagingResponse"/>
+				<logger level="INFO" doc:name="Logging File Data Staging Status" doc:id="471c3b77-48ae-43a1-b100-6e7f45ec9a9b" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;    "message": "Document file data staging infromation processing completed",&#10;	"fileName": vars.document.fileName,&#10;	"status": vars.idpFileDataStagingResponse.successful&#10;}]' />
+				<choice doc:name="Choice" doc:id="f4af9dfd-b235-411c-a308-ee79707c338a" >
+					<when expression="#[!isEmpty(vars.tables) and (vars.idpFileDataStagingResponse.successful == true)]">
+						<ee:transform doc:name="IDP Item Detail Request Payload" doc:id="99701315-865b-4dc0-a1f6-18d9512e8d8b" >
+							<ee:message >
+								<ee:set-payload resource="dwl/items.dwl" />
+							</ee:message>
+							<ee:variables >
+								<ee:set-variable variableName="object" ><![CDATA[%dw 2.0
+output application/json
+---
+p('salesforce.itemDetailObject')]]></ee:set-variable>
+							</ee:variables>
+						</ee:transform>
+						<logger level="DEBUG" doc:name="Payload Debug Logger" doc:id="534b6cdd-c36e-4709-944b-0a794cb68efd" message="#[%dw 2.0&#10;output application/json&#10;---&#10;payload]" category="com.cummins.idp.integration.payload" />
+						<flow-ref doc:name="salesforce-create-flow" doc:id="89d95500-f7ec-4a77-b939-53b9224f2e09" name="salesforce-create-flow" target="idpItemDetailResponse"/>
+						<ee:transform doc:name="Content Version Status" doc:id="52a5228e-2186-4058-b889-0ca904fdb93b">
+			<ee:message>
+			</ee:message>
+							<ee:variables>
+								<ee:set-variable variableName="contentVersionStatus"><![CDATA[%dw 2.0
+output application/json
+---
+if ( (vars.idpFileDataStagingResponse.successful == true) and (vars.idpFileDataStagingResponse.successful == true) ) p('status.pass') else p('status.failed')]]></ee:set-variable>
+								<ee:set-variable variableName="contentVersionMessage"><![CDATA[%dw 2.0
+output application/json
+---
+if ( vars.idpItemDetailResponse.successful != true ) vars.idpFileDataStagingResponse.items[0].message default [] else []]]></ee:set-variable>
+								<ee:set-variable variableName="checkListLineStatus" ><![CDATA[%dw 2.0
+output application/json
+---
+if ( (vars.idpFileDataStagingResponse.successful == true) and (vars.idpFileDataStagingResponse.successful == true) ) p('idp.status.success') else p('idp.status.failed')]]></ee:set-variable>
+							</ee:variables>
+		</ee:transform>
+						<logger level="INFO" doc:name="Logging Item Detail Status" doc:id="5c5c6540-6f8f-43af-be25-04f72e435bc1" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;    "message": "Document item detail infromation processing completed",&#10;	"fileName": vars.document.fileName,&#10;	"status": vars.idpItemDetailResponse.successful&#10;}]'/>
+					</when>
+					<otherwise>
+						<ee:transform doc:name="Content Version Status" doc:id="5b11ef54-8293-4aed-bc6f-5caaaae8c260">
+			<ee:message>
+			</ee:message>
+							<ee:variables>
+								<ee:set-variable variableName="contentVersionStatus"><![CDATA[%dw 2.0
+output application/json
+---
+if ( (vars.idpFileDataStagingResponse.successful != true) ) p('status.failed') else p('status.pass')]]></ee:set-variable>
+								<ee:set-variable variableName="contentVersionMessage"><![CDATA[%dw 2.0
+output application/json
+---
+if ( vars.idpFileDataStagingResponse.successful != true ) vars.idpFileDataStagingResponse.items[0].message default [] else []]]></ee:set-variable>
+								<ee:set-variable variableName="checkListLineStatus" ><![CDATA[%dw 2.0
+output application/json
+---
+if ( (vars.idpFileDataStagingResponse.successful != true) ) p('idp.status.failed') else p('idp.status.success')]]></ee:set-variable>
+							
+</ee:variables>
+		</ee:transform>
+						<logger level="INFO" doc:name="Logging Document Status And Item Details" doc:id="18d0085b-5b5d-4790-a3e3-bcf96d222fad" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	"message": if ( !isEmpty(vars.tables) ) "Failed to process the file data staging records; therefore, item details were not processed" else "No item details found for the document",&#10;	"fileName": vars.document.fileName&#10;}]' />
+					</otherwise>
+				</choice>
+			</when>
+			<otherwise >
+				<set-variable value='#["No fields or data were extracted from the document Using IDP"]' doc:name="Content Version Message Variable" doc:id="11dcbf20-03e5-41ce-9f8c-fec21c8d928e" variableName="contentVersionMessage" />
+				<set-variable value="#[p('status.failed')]" doc:name="Content Version Status Variable" doc:id="7ffba437-e249-49f8-a28a-656786ebcf73" variableName="contentVersionStatus"/>
+				<set-variable value="#[p('idp.status.failed')]" doc:name="Check List Line  Status Variable" doc:id="3c2ea877-79ed-47a9-950c-10c720843f69" variableName="checkListLineStatus"/>
+				<flow-ref doc:name="common-content-version-status-flow" doc:id="6b028f34-42bc-4f68-9585-3f50b52b45b7" name="common-content-version-status-flow" />
+				<logger level="INFO" doc:name="No Fields Found In Document" doc:id="f252c24c-97d2-4c02-971d-bfd874a4a541" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;    "message": vars.contentVersionMessage&#10;}]' />
+			</otherwise>
+		</choice>
+		<flow-ref doc:name="common-content-version-status-flow" doc:id="42c168f4-e590-4ee7-85e0-604a5536c0c6" name="common-content-version-status-flow"/>
+	</sub-flow>
+	<sub-flow name="validation-json-schema-flow" doc:id="8b9d162b-e245-4196-92ca-c0d634758451" >
+		<json:validate-schema doc:name="Validating JSON Schema" doc:id="58596467-e2dd-4236-ac9e-1fc4a9c43c50" schema='#["schema/" ++ vars.doc.documentType ++ ".json"]'>
+		</json:validate-schema>
+		<ee:dynamic-evaluate doc:name="Filtering Confidence Scores" doc:id="9f9e652e-60ff-4b1a-bc18-3193f0da91f8" target="hasLowConfidence" expression="#[readUrl('classpath://dwl/$(vars.confidenceScoreType).dwl', 'application/java')]"/>
+		<choice doc:name="Choice" doc:id="2161609f-0005-4fa2-bd9b-d939156b3dc4" >
+			<when expression="#[!isEmpty(vars.hasLowConfidence)]">
+				<raise-error doc:name="IDP:LOW_CONFIDENCE_SCORE" doc:id="f0cc310d-dee1-49aa-a85e-66ba6aa9044c" type="IDP:LOW_CONFIDENCE_SCORE" description="#[&quot;IDP extraction completed, confidence score is less than&quot; ++ p('confidenceScoreThreshold')]"/>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logging Validation Status" doc:id="c2c19751-04f2-4bd8-a151-e8339e3eb838" message="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;    &quot;message&quot;: &quot;Request matched the JSON Schema and the confidence score is above &quot; ++ p('confidenceScoreThreshold'),&#10;    &quot;fileName&quot;: vars.document.fileName&#10;}]"/>
+			</otherwise>
+		</choice>
+	</sub-flow>
+	<sub-flow name="task-creation-flow" doc:id="099c2668-254e-4bdb-bffa-920b485552f5" >
+		<ee:transform doc:name="Task Request Payload" doc:id="17043780-3778-40b1-bf06-d4b1366f47da" >
+					<ee:message >
+						<ee:set-payload resource="dwl/taskInputRequest.dwl" />
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="object" ><![CDATA[%dw 2.0
+output application/json
+---
+p('salesforce.taskObject')]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+		<logger level="INFO" doc:name="Logging Task Information" doc:id="042e65a7-d585-4edf-b69a-59623efabfaf" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	"status": "Failed",&#10;	"claimNumber": vars.claimNumber,&#10;	"message": vars.task,&#10;}]' />
+				<flow-ref doc:name="salesforce-create-flow" doc:id="80c20864-308c-4588-a566-74f7ac72abe1" name="salesforce-create-flow"/>
+				<logger level="INFO" doc:name="Logging Task Update Status" doc:id="fc8cde74-ec9c-4b07-a4b7-584610fc7ecf" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	"message": if ( payload.successful == true ) "Task creation has succeeded in Salesforce." else "Task creation has failed in Salesforce.",&#10;	"status": payload.successful&#10;}]'/>
+		<flow-ref doc:name="claim-status-update-flow" doc:id="415fd0ee-4c92-4917-8339-41ab0b0562c0" name="claim-status-update-flow"/>
+	</sub-flow>
+	<sub-flow name="claim-status-update-flow" doc:id="62b8e886-76b8-43d6-b8f9-9e3e8abd33d9" >
+		<ee:transform doc:name="Task Query" doc:id="f0348a18-0659-456f-aaad-644fc32c4aa5">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="search"><![CDATA[%dw 2.0
+output application/json
+---
+{
+	query: p('salesforce.taskQuery'),
+	"parameters": {
+		Id: vars.claimId
+	}
+}]]></ee:set-variable>
+				<ee:set-variable variableName="object"><![CDATA[%dw 2.0
+output application/json
+---
+p('salesforce.taskObject')]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="salesforce-search-flow" doc:id="f6d6242e-53f2-49c0-aa59-2db474be49df" name="salesforce-search-flow" />
+		<ee:transform doc:name="Task Status" doc:id="93ed3411-d049-4557-b99f-d2ea1457d4a7" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="taskStatus" ><![CDATA[%dw 2.0
+output application/json
+---
+payload filter ((item, index) -> item.Status == "Open")]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<ee:transform doc:name="Claim Update Request Payload" doc:id="fe0cb735-5835-4971-b016-d022548095cd">
+					<ee:message>
+				<ee:set-payload resource="dwl/claimStatusUpdate.dwl" />
+					
+</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="object"><![CDATA[%dw 2.0
+output application/json
+---
+p('salesforce.claim')]]></ee:set-variable>
+						<ee:set-variable variableName="objectName"><![CDATA[%dw 2.0
+output application/json
+---
+p('claim')]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+		<logger level="INFO" doc:name="Logging Claim Status" doc:id="117b52a7-c7ec-4dc8-be9b-bebc3527bcfe" message="#[%dw 2.0&#10;output application/json&#10;---&#10;payload]" />
+		<flow-ref doc:name="salesforce-update-flow" doc:id="ff33bd0c-9f90-4d51-b23e-e88e3d56bf9c" name="salesforce-update-flow" />
+		<logger level="INFO" doc:name="Logging Claim Update Status" doc:id="85136d91-2f8f-45ff-b30f-4897fd4cc9b0" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	"message": if ( payload.successful == true ) "Claim status updated successfully in Salesforce." else "Failed to update claim status in Salesforce.",&#10;	"claimNumber": vars.claimNumber,&#10;	"status": payload.successful&#10;}]' />
+	</sub-flow>
+</mule>

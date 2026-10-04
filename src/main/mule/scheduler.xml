@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<flow name="claim-reprocessing-scheduler-flow" doc:id="cc5011f4-248f-412b-b0c9-045885c103c4" >
+		<scheduler doc:name="Scheduler" doc:id="22794e4d-8e5d-499f-9d3d-b375633642a5" >
+			<scheduling-strategy >
+				<cron expression="0 0 0,12 * * ?"/>
+			</scheduling-strategy>
+		</scheduler>
+		<ee:transform doc:name="Check List Line Query" doc:id="cb51c7e6-58f8-4aca-bd65-fd2b19af743e">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="search"><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"query": p('salesforce.checkListLineQuery')
+}]]></ee:set-variable>
+				<ee:set-variable variableName="object"><![CDATA[%dw 2.0
+output application/json
+---
+p('checklistLine')]]></ee:set-variable>
+			
+</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logging  Check List Line Status" doc:id="a9d0fbde-9262-4996-8554-e02bd541f80c" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	"message": "Retrived check list lines that need to be reprocessed from salesforce"&#10;}]'/>
+		<flow-ref doc:name="salesforce-search-flow" doc:id="dbaeca90-5c24-4600-9b65-aa24e06fb15d" name="salesforce-search-flow" />
+		<choice doc:name="Choice" doc:id="3b752b2e-23c1-4ffe-8062-16a9d71bd99b" >
+			<when expression="#[!isEmpty(payload)]">
+				<ee:transform doc:name="Check List Lines" doc:id="891f54f7-b2b2-4bb7-a8a9-cd2fb0a81652">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+((payload map ((item, index) -> {
+	"repairOrderId": item.dmpl__RepairOrderId__c,
+	"checklistLineId": item.Id,
+	"label": item.dmpl__CheckListTemplateLineId__r.Name
+})) filter ((item, index) -> !isEmpty(item.repairOrderId) and !isEmpty(item.label) and !isEmpty(item.checklistLineId) )) groupBy ((item, index) -> item.repairOrderId)]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<flow-ref doc:name="claim-bill-reprocessing-impl-flow" doc:id="b528901c-1b27-4bf1-9591-3dbff63ad20e" name="claim-bill-reprocessing-impl-flow" />
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="No Records Found For Re-Processing" doc:id="3ad8869f-2ed3-4c5a-8fc6-af53d648e32d" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;    "message": "No checklist lines records found in salesforce for reprocessing"&#10;}]' />
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="Logging  Completion Status" doc:id="93025a3a-da15-4f19-be15-71a7c1185b7a" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	"message": "Completed Reprocessing of all the records"&#10;}]'/>
+	
+</flow>
+	<sub-flow name="claim-bill-reprocessing-impl-flow" doc:id="b77e543e-8374-4ae5-8574-9239fd0235d4" >
+		<foreach doc:name="Iterate Over Each Claim" doc:id="ee0ee488-71bf-462d-a468-5ab05daba888" collection="#[payload pluck ((value, key, index) -&gt; value)]">
+			<try doc:name="Try" doc:id="a882a702-d1e6-4f1d-8f35-c5a4f88be4d9" >
+				<ee:transform doc:name="Content Document Link Query" doc:id="02fb0c3e-8e3d-4834-ab3d-8f74e5a98742">
+					<ee:message />
+					<ee:variables>
+						<ee:set-variable variableName="search"><![CDATA[%dw 2.0
+output application/json
+---
+{
+	query: p('salesforce.ContentDocumentLinkQuery'),
+	"parameters": {
+		Id: "('" ++ ((payload map ((item, index) -> item.checklistLineId) distinctBy ((item, index) -> item)) joinBy  "','") ++ "')"
+	}
+}]]></ee:set-variable>
+						<ee:set-variable variableName="object"><![CDATA[%dw 2.0
+output application/json
+---
+p('ContentDocumentLink')]]></ee:set-variable>
+						<ee:set-variable variableName="repairOrder"><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="INFO" doc:name="Logging Content Document Status" doc:id="de747018-1461-4331-aea3-b084d813fbd1" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	"message": "Retrived content document data for reprocessing records from salesforce"&#10;}]'/>
+				<flow-ref doc:name="salesforce-search-flow" doc:id="b0d49caa-37d2-466e-ae10-021fde3d2938" name="salesforce-search-flow" />
+				<choice doc:name="Choice" doc:id="80cdc145-c68b-45d9-910b-43d2958d0b35" >
+			<when expression="#[!isEmpty(payload)]">
+				<ee:transform doc:name="Claim Query" doc:id="2b06e483-d89b-49fb-825b-e55579aef78b">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="object"><![CDATA[%dw 2.0
+output application/json
+---
+p('claim')]]></ee:set-variable>
+				<ee:set-variable variableName="search"><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"query": p('salesforce.claimQuery'),
+	"parameters": {
+		Id: "('" ++ ((vars.repairOrder map ((item, index) -> item.repairOrderId) distinctBy ((item, index) -> item)) joinBy  "','") ++ "')"
+	}
+}]]></ee:set-variable>
+						<ee:set-variable variableName="contentData"><![CDATA[%dw 2.0
+output application/json
+---
+payload map ((item, index) ->{
+	"fileName": item.ContentDocument.Title,
+	"checklistLineId": item.LinkedEntityId,
+	"contentVersionId": item.ContentDocument.LatestPublishedVersion.Id,
+	"contentDocumentId": item.ContentDocumentId,
+	"label": (vars.repairOrder filter ((i, ix) -> i.checklistLineId == item.LinkedEntityId))[0].label
+}) ]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+				<flow-ref doc:name="salesforce-search-flow" doc:id="def75b6c-2b4e-4c6c-b647-f4efc8dedb69" name="salesforce-search-flow" />
+				<logger level="INFO" doc:name="Logging Claim Status" doc:id="79e8bed7-b882-486a-828f-dce5d136a86f" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	"message": "Retrived claim information from salesforce"&#10;}]' />
+				<choice doc:name="Choice" doc:id="072986ec-5ede-416e-8f6e-93bebdad265c">
+					<when expression="#[!isEmpty(payload)]">
+								<ee:transform doc:name="Claim and Service Order Number Variables" doc:id="6f33d7eb-6da1-4dfe-8e8b-57d5a7bb52f7">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"triggeringUserId": payload[0].OwnerId,
+	"documents": vars.contentData,
+	"repairOrderId": payload[0].dmpl__RepairOrderId__c,
+	"claimNumber": payload[0].DocumentReference__c,
+	"claimId": payload[0].Id
+}]]></ee:set-payload>
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="serviceOrderId"><![CDATA[%dw 2.0
+output application/json
+---
+payload[0].dmpl__RepairOrderId__c]]></ee:set-variable>
+						<ee:set-variable variableName="claimId"><![CDATA[%dw 2.0
+output application/json
+---
+payload[0].Id]]></ee:set-variable>
+						<ee:set-variable variableName="claimNumber"><![CDATA[%dw 2.0
+output application/json
+---
+payload[0].DocumentReference__c]]></ee:set-variable>
+						<ee:set-variable variableName="startTime"><![CDATA[%dw 2.0
+output application/json
+---
+now()]]></ee:set-variable>
+						<ee:set-variable variableName="triggeringUserId"><![CDATA[%dw 2.0
+output application/json
+---
+payload[0].OwnerId ]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+						<logger level="INFO" doc:name="Logging Claim/Bill Number" doc:id="6c015294-52fe-45b8-9277-bd8aaf6f8796" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	"serviceOrderId": vars.serviceOrderId,&#10;	"claimNumber": vars.claimNumber,&#10;	"claimId": vars.claimId,&#10;}]' />
+								<flow-ref doc:name="claim-bill-impl-flow" doc:id="e5d36f48-2cd9-451f-aa70-a2f6fad8dd33" name="claim-bill-impl-flow" />
+					
+</when>
+					<otherwise >
+						<logger level="INFO" doc:name="No Records Found Claim" doc:id="b2b4f99f-70b5-4096-aa0e-304d4f3e5f8c" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;    "message": "No claims records found in salesforce for reprocessing"&#10;}]'/>
+					</otherwise>
+				</choice>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="No Records Found In Content Document" doc:id="051c2642-9b60-4a7c-95f3-ffbd26aa7ae5" message='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;    "message": "No content document data records found in salesforce for reprocessing"&#10;}]'/>
+			</otherwise>
+		</choice>
+				<error-handler ref="common-error-handler" />
+			</try>
+		</foreach>
+	</sub-flow>
+</mule>

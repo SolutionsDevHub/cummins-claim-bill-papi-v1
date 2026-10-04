@@ -1,0 +1,7 @@
+# Autodiscovery Id
+api:
+  id: ""
+  
+#Salesforce Credentails
+salesforce:
+  tokenUrl: ""

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit"
+	xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties"
+	xmlns:api-gateway="http://www.mulesoft.org/schema/mule/api-gateway" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:oauth="http://www.mulesoft.org/schema/mule/oauth" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd 
+http://www.mulesoft.org/schema/mule/api-gateway http://www.mulesoft.org/schema/mule/api-gateway/current/mule-api-gateway.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/oauth http://www.mulesoft.org/schema/mule/oauth/current/mule-oauth.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd">
+	<http:listener-config name="cummins-claim-bill-papi-httpListenerConfig">
+        <http:listener-connection host="${http.listener.host}" port="${http.listener.port}" readTimeout="${http.listener.readTimeOut}"/>
+    </http:listener-config>
+    <apikit:config name="cummins-claim-bill-papi-config" api="resource::a658556f-eb3a-48d9-8df6-7416d847a5f6:cummins-claim-bill-papi:1.0.0:raml:zip:cummins-claim-bill-papi.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
+	<http:request-config name="IDP_Request_configuration" doc:name="HTTP Request configuration" doc:id="f88efed0-a503-4d70-8e8f-032afb291cf5" basePath="/api" responseTimeout="60000" doc:description="IDP Request Configuration">
+		<http:request-connection protocol="HTTPS" host="${idp.host}" >
+			<http:authentication >
+				<oauth:client-credentials-grant-type clientId="${secure::idp.clientId}" clientSecret="${secure::idp.clientSecret}" tokenUrl="${idp.tokenUrl}" />
+			</http:authentication>
+		</http:request-connection>
+	</http:request-config>
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="caf5f3df-9922-4ac5-904a-433a08fae02d" doc:description="Salesforce Configuration">
+		<salesforce:oauth-client-credentials-connection >
+			<salesforce:oauth-client-credentials clientId="${secure::salesforce.clientId}" clientSecret="${secure::salesforce.clientSecret}" tokenUrl="${salesforce.tokenUrl}"/>
+		</salesforce:oauth-client-credentials-connection>
+    </salesforce:sfdc-config>
+    <configuration-properties doc:name="Configuration properties" doc:id="2552cc81-a7b6-4bde-b6e5-39355a78ca3f" file="config\config.yaml" doc:description="Common Properties" />
+    <configuration-properties doc:name="Configuration properties" doc:id="2e5cddfd-a23a-4195-badb-9c111994a5ae" file="config\config-${mule.env}.yaml" doc:description="Environment Specific Properties" />
+    <secure-properties:config name="Secure_Properties_Config" doc:name="Secure Properties Config" doc:id="17183032-0b16-4a11-abc3-aa798535725a" file="config\config-secured-${mule.env}.yaml" key="${mule.key}" doc:description="Environment Secure Properties"/>
+	<api-gateway:autodiscovery apiId="${api.id}" ignoreBasePath="true" doc:name="API Autodiscovery" doc:id="a0270869-ba46-4e2a-86b8-b35cd7d770ec" flowRef="cummins-claim-bill-papi-main" doc:description="Autodiscovery Id"/>
+	<os:object-store name="IDP_Object_Store" doc:name="Object store" doc:id="8c72dcaf-8a1a-47cd-9af9-e98b6714f5eb" doc:description="IDP_Object_Store" entryTtl="${objectStore.ttl}" entryTtlUnit="DAYS" expirationInterval="${objectStore.tte}"/>
+</mule>
